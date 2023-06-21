@@ -23,10 +23,15 @@ class Activity(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
     difficulty = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, server_default = db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate = db.func.now())
 
     # Add relationship
+    signups = db.relationship('Signup', back_populates = 'activity', cascade="all, delete-orphan")
+    campers = association_proxy('signups', 'campers')
     
     # Add serialization rules
+    serialize_rules = ('-signups.activity', '-campers.activities')
     
     def __repr__(self):
         return f'<Activity {self.id}: {self.name}>'
@@ -38,12 +43,28 @@ class Camper(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     age = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, server_default = db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate = db.func.now())
 
     # Add relationship
+    signups = db.relationship('Signup', back_populates = 'camper', cascade="all, delete-orphan")
+    activities = association_proxy('signups', 'activity')
     
     # Add serialization rules
+    serialize_rules = ('-signups.camper', '-activities.campers')
     
     # Add validation
+    @validates('name')
+    def name_validate(self,key,name):
+        if not name:
+            raise ValueError("Camper must have a name.")
+        return name
+    
+    @validates('age')
+    def age_validate(self,key,age):
+        if (age > 18) or (age < 8 ):
+            raise ValueError("Camper must be between the ages of 8 and 18.")
+        return age
     
     
     def __repr__(self):
@@ -55,12 +76,24 @@ class Signup(db.Model, SerializerMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     time = db.Column(db.Integer)
+    camper_id = db.Column(db.Integer, db.ForeignKey('campers.id'))
+    activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'))
+    created_at = db.Column(db.DateTime, server_default = db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate = db.func.now())
 
     # Add relationships
+    camper = db.relationship('Camper', back_populates = 'signups')
+    activity = db.relationship('Activity', back_populates = 'signups')
     
     # Add serialization rules
+    serialize_rules = ('-camper.signups', '-activity.signups')
     
     # Add validation
+    @validates('time')
+    def time_validate(self,key,time):
+        if not (0 <= time <= 23):
+            raise ValueError("Time must be between 0 and 23")
+        return time
     
     def __repr__(self):
         return f'<Signup {self.id}>'
